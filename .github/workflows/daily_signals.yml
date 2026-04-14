@@ -1,0 +1,94 @@
+name: Daily K Platform Signal Report
+
+on:
+  schedule:
+    # Paris time = UTC+1 (winter) / UTC+2 (summer)
+    # Using UTC+1 (conservative — adjusts ~1h off during summer DST)
+    - cron: "30 6 * * 1-5"   # 07:30 Paris (UTC+1) — morning briefing
+    - cron: "0 16 * * 1-5"   # 17:00 Paris (UTC+1) — end-of-day briefing
+  workflow_dispatch:  # Allow manual trigger from GitHub UI
+
+permissions:
+  contents: write  # Needed to commit the report back to the repo
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # ── 1. Checkout ─────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # ── 2. Set up Python ────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # ── 3. Install dependencies ─────────────────────────────────────────────
+      - name: Install dependencies
+        run: |
+          pip install -r scripts/requirements.txt
+
+      # ── 4. Detect run slot (morning vs evening) ──────────────────────────────
+      - name: Detect run slot
+        id: slot
+        run: |
+          HOUR=$(date -u +%H)
+          if [ "$HOUR" -lt 12 ]; then
+            echo "slot=morning" >> $GITHUB_OUTPUT
+            echo "slot_label=🌅 Morning Briefing (07:30)" >> $GITHUB_OUTPUT
+          else
+            echo "slot=evening" >> $GITHUB_OUTPUT
+            echo "slot_label=🌆 Evening Briefing (17:00)" >> $GITHUB_OUTPUT
+          fi
+
+      # ── 5. Run signal gatherer ───────────────────────────────────────────────
+      - name: Run signal gatherer
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+          RUN_SLOT: ${{ steps.slot.outputs.slot }}
+        run: |
+          python scripts/gather_signals.py
+
+      # ── 6. Commit report to repo ─────────────────────────────────────────────
+      - name: Commit and push report
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add reports/
+          git diff --staged --quiet || git commit -m "📊 Signal report $(date +%Y-%m-%d) — ${{ steps.slot.outputs.slot }}"
+          git push
+
+      # ── 7. Send email report ─────────────────────────────────────────────────
+      - name: Send email report
+        env:
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          RUN_SLOT_LABEL: ${{ steps.slot.outputs.slot_label }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          python scripts/notify_email.py
+      # ── 8. Send Slack notification ────────────────────────────────────────────
+      - name: Send Slack notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_SLOT_LABEL: ${{ steps.slot.outputs.slot_label }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          python scripts/notify_slack.py
+
+      # ── 9. Upload as artifact ────────────────────────────────────────────────
+      - name: Upload report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: signal-report-${{ steps.slot.outputs.slot }}-${{ github.run_id }}
+          path: reports/
+          retention-days: 30
