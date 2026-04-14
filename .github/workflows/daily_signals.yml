@@ -66,16 +66,7 @@ jobs:
           git diff --staged --quiet || git commit -m "📊 Signal report $(date +%Y-%m-%d) — ${{ steps.slot.outputs.slot }}"
           git push
 
-      # ── 7. Send email report ─────────────────────────────────────────────────
-      - name: Send email report
-        env:
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
-          RUN_SLOT_LABEL: ${{ steps.slot.outputs.slot_label }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-        run: |
-          python scripts/notify_email.py
-      # ── 8. Send Slack notification ────────────────────────────────────────────
+      # ── 7. Send Slack notification ────────────────────────────────────────────
       - name: Send Slack notification
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -85,7 +76,7 @@ jobs:
         run: |
           python scripts/notify_slack.py
 
-      # ── 9. Upload as artifact ────────────────────────────────────────────────
+      # ── 8. Upload as artifact ────────────────────────────────────────────────
       - name: Upload report as artifact
         uses: actions/upload-artifact@v4
         with:
