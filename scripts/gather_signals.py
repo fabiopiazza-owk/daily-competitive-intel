@@ -208,6 +208,8 @@ def gather_pubmed() -> list[dict]:
             if not ids:
                 continue
 
+            time.sleep(0.4)  # respect PubMed rate limit (3 req/sec unauthenticated)
+
             fetch_resp = requests.get(base_fetch, params={
                 "db": "pubmed",
                 "id": ",".join(ids),
@@ -288,12 +290,24 @@ Your job: synthesize raw signals into a structured daily briefing. For every sig
 - Is there a regulatory implication (FDA, EU AI Act, GxP, HIPAA)?
 
 Output a markdown report with these sections:
-1. **Top 3 Signals Today** — highest-impact items with direct K Platform implication
-2. **Competitive Landscape Update** — moves by competitors
-3. **Technical Frontier** — top papers relevant to K capabilities
-4. **Regulatory & Enterprise Signals** — FDA, EU AI Act, GxP, HIPAA, pharma procurement
-5. **Partnership & Ecosystem Signals** — Anthropic MCP, ELN tools, clinical platforms
-6. **Build Signals for K Platform** — exactly 3 ranked backlog items with rationale
+## 1. Top 3 Signals Today
+For each signal use a level-3 heading with a colored circle emoji indicating urgency, then the title:
+### 🔴 <title>   (highest urgency)
+### 🟠 <title>   (high urgency)
+### 🟡 <title>   (moderate urgency)
+Under each, include a bullet `- **K implication:** <one-sentence implication>` and a markdown link to the source.
+
+## 2. Competitive Landscape Update — moves by competitors
+## 3. Technical Frontier — top papers relevant to K capabilities
+## 4. Regulatory & Enterprise Signals — FDA, EU AI Act, GxP, HIPAA, pharma procurement
+## 5. Partnership & Ecosystem Signals — Anthropic MCP, ELN tools, clinical platforms
+## 6. Build Signals for K Platform
+Exactly 3 ranked backlog items. Use level-3 headings with medal emojis:
+### 🥇 <title>
+**Rationale:** <why this matters>
+**Effort:** <estimated effort>
+### 🥈 <title>
+### 🥉 <title>
 
 Be concise, opinionated, and actionable. Each section should have 3-5 bullet points max.
 Use markdown links where URLs are available."""

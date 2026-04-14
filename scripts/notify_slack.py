@@ -43,22 +43,45 @@ def parse_top_signals(section: str) -> list[dict]:
     """Parse section 1 into a list of {emoji, title, summary, link}."""
     signals = []
     current = None
+    # Match emoji-prefixed headings (### 🔴 Title) or numbered headings (### 1. Title)
+    heading_re = re.compile(r"^###\s+(?:(🔴|🟠|🟡|🟢)\s+|(\d+)\.\s*)(.+)$")
+    fallback_emojis = ["🔴", "🟠", "🟡", "🟢"]
+
     for line in section.split("\n"):
-        m = re.match(r"^### (🔴|🟠|🟡|🟢)\s+(.+)$", line)
+        m = heading_re.match(line)
         if m:
             if current:
                 signals.append(current)
-            current = {"emoji": m.group(1), "title": m.group(2), "summary": "", "link": ""}
+            emoji = m.group(1) or fallback_emojis[min(len(signals), len(fallback_emojis) - 1)]
+            title = m.group(3)
+            current = {"emoji": emoji, "title": title, "summary": "", "link": ""}
         elif current:
             link_match = re.search(r"\[.+?\]\((.+?)\)", line)
-            if line.startswith("- **K implication:**"):
-                current["summary"] += line.replace("- **K implication:**", "").strip() + " "
+            if "**K implication:**" in line:
+                current["summary"] += line.split("**K implication:**")[-1].strip() + " "
             elif link_match and not current["link"]:
                 current["link"] = link_match.group(1)
             elif not line.startswith("---") and not line.startswith("## ") and line.strip():
                 current["summary"] += line.strip() + " "
     if current:
         signals.append(current)
+
+    # Last-resort fallback: extract bold items as signals if no headings matched
+    if not signals:
+        bold_re = re.compile(r"^\s*[-*\d.]+\s*\*\*(.+?)\*\*[:\s]*(.*)$")
+        for line in section.split("\n"):
+            bm = bold_re.match(line)
+            if bm:
+                link_match = re.search(r"\[.+?\]\((.+?)\)", line)
+                signals.append({
+                    "emoji": fallback_emojis[min(len(signals), len(fallback_emojis) - 1)],
+                    "title": bm.group(1),
+                    "summary": bm.group(2).strip(),
+                    "link": link_match.group(1) if link_match else "",
+                })
+            if len(signals) >= 3:
+                break
+
     return signals
 
 
