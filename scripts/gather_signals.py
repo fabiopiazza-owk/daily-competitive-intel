@@ -2,7 +2,7 @@
 """
 Daily signal gatherer for K Platform intelligence.
 Sources: Arxiv, HuggingFace Daily Papers, RSS feeds, PubMed, Brave Search.
-Synthesizes with Claude (claude-opus-4-6) into a structured PM briefing.
+Synthesizes with Claude (claude-opus-4-7) into a structured PM briefing.
 """
 
 import os
@@ -343,11 +343,15 @@ Include **Date:** {TODAY} and **Run:** {RUN_SLOT} at the top."""
 
     print(f"[SYNTH] Sending {len(all_signals)} signals to Claude for synthesis...")
     message = client.messages.create(
-        model="claude-opus-4-6",
+        model="claude-opus-4-7",
         max_tokens=4096,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_prompt}],
     )
+
+    if not message.content:
+        print(f"[SYNTH] ERROR: Empty response from Claude (stop_reason={message.stop_reason})")
+        raise RuntimeError(f"Claude returned empty content (stop_reason={message.stop_reason})")
 
     report = message.content[0].text
     print(f"[SYNTH] Report generated ({len(report)} chars)")
